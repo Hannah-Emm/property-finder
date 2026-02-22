@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgis/postgis:18-3.6
+    restart: always
+    shm_size: 128mb
+    ports:
+      - "5432:5432"
+    networks:
+    - postgres-network
+    volumes:
+      - type: bind
+        source: ./db
+        target: /postgres
+    environment:
+      PGPASSWORD: admin
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: db
+      PGDATA: /postgres
+
+  property-fetcher:
+    build: ./property-fetcher
+    networks:
+    - postgres-network
+    depends_on:
+      - db
+  
+  journey-planner:
+    build: ./journey-planner
+    networks:
+    - postgres-network
+    depends_on:
+      - db
+    
+networks:
+  postgres-network:
+    driver: bridge
