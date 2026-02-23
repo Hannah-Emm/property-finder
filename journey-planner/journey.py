@@ -3,6 +3,7 @@ from datetime import datetime
 import psycopg
 import requests
 import json
+from datetime import datetime, timedelta
 
 class StartType(Enum):
     DEPART = 0
@@ -52,11 +53,12 @@ class JourneyFinder():
     HEADERS = {
         "Accept-Encoding": "gzip, deflate"
     }
+    DATE_FORMAT = "%Y-%m-%d"
 
     def __init__(self, connection : psycopg.Connection):
         self.connection = connection
 
-    def search(self, request : TrainJourneySearchRequest) -> TrainJourneySearchResponse:
+    def search(self, request : TrainJourneySearchRequest) -> TrainJourneySearchResponse | None:
         response = None
 
         # get results from db
@@ -70,12 +72,20 @@ class JourneyFinder():
             if row != None:
                 response = TrainJourneySearchResponse(request, row[0], row[1])
         
-        # if not results or outdated: fetch from api
+        # if no results fetch from api
         if response == None:
+            today = datetime.today()
+            current_week_day = today.weekday() + 1 if today.weekday() < 6 else 0
+            if current_week_day < request.day_of_week.value:
+                search_date = (today + timedelta(days=request.day_of_week.value - current_week_day)).strftime(JourneyFinder.DATE_FORMAT)
+            else:
+                search_date = (today + timedelta(days=7 - current_week_day + request.day_of_week.value)).strftime(JourneyFinder.DATE_FORMAT)
+            outward_time = f"{search_date}T{request.start_time}Z"
+            inward_time = f"{search_date}T{request.return_time}Z"
             api_request_body = {
                 "origin": {"crs":request.origin,"group":False},
                 "destination": {"crs":request.destination,"group":True},
-                "outwardTime": {"travelTime":"2026-02-26T09:15:00Z","type":request.start_type.name},
+                "outwardTime": {"travelTime":outward_time,"type":request.start_type.name},
                 "fareRequestDetails": {
                     "passengers": {"adult":1,"child":0},
                     "fareClass":"ANY",
@@ -86,12 +96,14 @@ class JourneyFinder():
                 "onlySearchForSleeper":False,
                 "overtakenTrains":True,
                 "useAlternativeServices":False,
-                "inwardTime": {"travelTime": "2026-02-26T17:30:00Z","type":request.return_type.name},
+                "inwardTime": {"travelTime": inward_time,"type":request.return_type.name},
                 "increasedInterchange":"ZERO"
             }
+
             api_response = requests.post(JourneyFinder.ENDPOINT, json=api_request_body, headers=JourneyFinder.HEADERS)
             if api_response.status_code == 400:
                 print("Bad request for ", request)
+                return None
             response = TrainJourneySearchResponse(request, datetime.now(), api_response.json())
 
             # update or store in db
