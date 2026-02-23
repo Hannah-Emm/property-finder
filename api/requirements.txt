@@ -1,0 +1,4 @@
+requests == 2.32.5
+psycopg == 3.3.2
+psycopg_pool == 3.3.0
+fastapi[standard-no-fastapi-cloud-cli] == 0.132.0
