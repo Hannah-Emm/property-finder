@@ -16,6 +16,7 @@ params = {
 }
 headers = {}
 
+
 def fetchProperties(cursor):
     index = 0
     next = None
@@ -35,6 +36,7 @@ def fetchProperties(cursor):
         storeProperties(cursor, response['properties'])
         sleep(0.1)
 
+
 def storeProperties(cursor, propertiesJson):
     if len(propertiesJson) == 0:
         return
@@ -45,14 +47,14 @@ def storeProperties(cursor, propertiesJson):
         latitude = property['location']['latitude']
         location = "point({} {})".format(longitude, latitude)
         address = property['displayAddress']
-        #TODO: handle non monthly prices
+        # TODO: handle non monthly prices
         price = property['price']['amount']
         bedrooms = property['bedrooms']
         bathrooms = property['bathrooms']
         properties.append([id, location, address, price, bedrooms, bathrooms])
 
     cursor.executemany(
-    """INSERT INTO properties (id, location, address, price, bedrooms, bathrooms) 
+        """INSERT INTO properties (id, location, address, price, bedrooms, bathrooms) 
     values (%s, %s, %s, %s, %s, %s) 
     ON CONFLICT(id) DO UPDATE SET 
     location = EXCLUDED.location,
@@ -60,9 +62,10 @@ def storeProperties(cursor, propertiesJson):
     price = EXCLUDED.price,
     bedrooms = EXCLUDED.bedrooms,
     bathrooms = EXCLUDED.bathrooms
-    """, 
-    properties)
+    """,
+        properties)
     print("Stored {} properties".format(len(properties)))
+
 
 if __name__ == "__main__":
     print('Started!')
