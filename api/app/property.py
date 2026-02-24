@@ -1,6 +1,6 @@
 from .db import DBConnection, db_fetch_all
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Annotated
 
 
 class PropertySearchRequest(BaseModel):
@@ -23,11 +23,6 @@ class Station(BaseModel):
     location: tuple[float, float]
 
 
-class PropertySearchResponse(BaseModel):
-    request: PropertySearchRequest
-    results: dict[str, list[Property]]
-
-
 class PropertyFinder():
     _SEARCH_BY_NEAR_STATIONS_QUERY_TEMPLATE = """
                 select p.id, ST_X(p.location::geometry), ST_Y(p.location::geometry), address, price, bedrooms, bathrooms, s.id, s.name, ST_X(s.location::geometry), ST_Y(s.location::geometry) from properties as p
@@ -38,12 +33,13 @@ class PropertyFinder():
     def __init__(self, connection: DBConnection):
         self.connection = connection
 
-    async def find_properties_near_stations(self, request: PropertySearchRequest) -> PropertySearchResponse:
+    async def find_properties_near_stations(self, request: PropertySearchRequest) -> dict[Annotated[str, "Station ID"], list[Property]]:
         args = [request.max_station_distance, request.max_price]
         rows = await db_fetch_all(self.connection, PropertyFinder._SEARCH_BY_NEAR_STATIONS_QUERY_TEMPLATE, args)
         results = {}
         for row in rows:
-            station = Station(id=str(row[7]), name=str(row[8]), location=(row[9], row[10]))
+            station = Station(id=str(row[7]), name=str(
+                row[8]), location=(row[9], row[10]))
             results.setdefault(station.id, []).append(
                 Property(id=str(row[0]), location=(row[1], row[2]), address=str(row[3]), price=str(row[4]), bedrooms=row[5], bathrooms=row[6]))
-        return PropertySearchResponse(request=request, results=results)
+        return results
