@@ -1,6 +1,7 @@
 from .db import DBConnection, db_fetch_all
 from pydantic import BaseModel
 from typing import Optional, Annotated
+from fastapi import Depends
 
 
 class PropertySearchRequest(BaseModel):
@@ -43,3 +44,7 @@ class PropertyFinder():
             results.setdefault(station.id, []).append(
                 Property(id=str(row[0]), location=(row[1], row[2]), address=str(row[3]), price=str(row[4]), bedrooms=row[5], bathrooms=row[6]))
         return results
+
+
+type PropertyFinderInstance = Annotated[PropertyFinder, Depends(
+    PropertyFinder)]
