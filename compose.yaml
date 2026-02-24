@@ -11,12 +11,8 @@ services:
       - type: bind
         source: ./db
         target: /postgres
-    environment:
-      PGPASSWORD: admin
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: admin
-      POSTGRES_DB: db
-      PGDATA: /postgres
+    env_file:
+      - local.env
 
   property-fetcher:
     build: ./property-fetcher
@@ -34,12 +30,15 @@ services:
   
   api:
     build: ./api
+    restart: always
     networks:
     - postgres-network
     ports:
       - "8080:8080"
     depends_on:
           - db
+    env_file:
+      - local.env
     
 networks:
   postgres-network:
