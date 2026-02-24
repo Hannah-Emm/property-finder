@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, Depends
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
-from .db import get_db_connection_pool, db_conn, DBConnection
+from .db import get_db_connection_pool, db_conn, DBConnection, db_fetch_all, db_fetch_one
 
 
 @asynccontextmanager
@@ -16,6 +16,4 @@ app = FastAPI(lifespan=lifespan, dependencies=[Depends(db_conn)])
 
 @app.get("/")
 async def read_root(connection: DBConnection):
-    async with connection.cursor() as cursor:
-        await cursor.execute("select * from properties")
-        return await cursor.fetchone()
+    return await db_fetch_all(connection, "select * from properties where price<=%s", [1200])
