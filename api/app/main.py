@@ -1,7 +1,8 @@
-from fastapi import FastAPI, Request, Depends
+from fastapi import FastAPI, Depends
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
-from .db import get_db_connection_pool, db_conn, DBConnection, db_fetch_all, db_fetch_one
+from .db import get_db_connection_pool, db_conn, DBConnection
+from .property import PropertyFinder, PropertySearchRequest, PropertySearchResponse
 
 
 @asynccontextmanager
@@ -14,6 +15,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(lifespan=lifespan, dependencies=[Depends(db_conn)])
 
 
-@app.get("/")
-async def read_root(connection: DBConnection):
-    return await db_fetch_all(connection, "select * from properties where price<=%s", [1200])
+@app.post("/search/near-stations", response_model=PropertySearchResponse)
+async def search_near_stations(search_request: PropertySearchRequest, connection: DBConnection) -> PropertySearchResponse:
+    response = await PropertyFinder(connection).find_properties_near_stations(search_request)
+    return response
