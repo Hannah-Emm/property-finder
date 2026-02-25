@@ -25,6 +25,11 @@ async def db_conn(request: Request) -> AsyncGenerator[Connection]:
         yield conn
 
 
+async def db_execute(connection: Connection, sql: str, args: list[Any] | None = None) -> None:
+    async with connection.cursor() as cursor:
+        await cursor.execute(sql, args)
+
+
 async def db_fetch_one(connection: Connection, sql: str, args: list[Any] | None = None) -> tuple[Any, ...] | None:
     async with connection.cursor() as cursor:
         await cursor.execute(sql, args)
