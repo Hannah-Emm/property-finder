@@ -32,9 +32,7 @@ class DayOfWeek(Enum):
     SAT = 6
 
 
-class TrainJourneySearchRequest(BaseModel):
-    origin: str
-    destination: str
+class TrainjourneyOptions(BaseModel):
     start_time: str
     start_type: StartType
     return_time: str | None
@@ -44,6 +42,11 @@ class TrainJourneySearchRequest(BaseModel):
 
     def is_return_journey(self):
         return self.return_time != None
+
+
+class TrainJourneySearchRequest(TrainjourneyOptions):
+    origin: str
+    destination: str
 
 
 class JourneyTimeDetails(BaseModel):
@@ -75,7 +78,7 @@ class JourneyFareDetails(BaseModel):
 
 
 class JourneyDetails(BaseModel):
-    journey_time_details: JourneyTimeDetails
+    journey_time_details: Optional[JourneyTimeDetails] = None
 
 
 class JourneySummary(BaseModel):
@@ -114,6 +117,8 @@ class JourneyFinder():
         # if no results fetch from api
         if response == None:
             response = self._get_journey_from_api(search_request)
+            if response == None or response.data == None:
+                return None
             # update or store in db
             await self._cache_journey(search_request, response)
         return response
@@ -171,7 +176,15 @@ class JourneyFinder():
                 shortest_wait=min(wait_times),
                 average_wait=int(mean(wait_times)),
                 longest_wait=max(wait_times))
-        return JourneyTimeDetails(min(durations), mean(durations), max(durations), min_changes, max_changes)
+        elif len(times) == 1:
+            return JourneyTimeDetails(
+                fastest_time=min(durations),
+                average_time=int(mean(durations)),
+                slowest_time=max(durations),
+                least_changes=min_changes,
+                most_changes=max_changes)
+        else:
+            return None
 
     def _get_journey_fare_details(self, search_request: TrainJourneySearchRequest, data: dict) -> JourneyFareDetails:
         return_fares = []
