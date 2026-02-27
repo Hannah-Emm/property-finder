@@ -8,7 +8,7 @@ import re
 from fastapi import Depends
 from typing import Annotated, Optional
 from pydantic import BaseModel
-from .db import DBConnection, db_fetch_one, db_execute, db_execute_many, db_execute_many_fetch
+from .db import DBConnection, db_fetch_one, db_execute_many, db_execute_many_fetch
 import aiohttp
 import asyncio
 import json
@@ -81,7 +81,7 @@ class JourneyFareDetails(BaseModel):
 
 
 class JourneyDetails(BaseModel):
-    journey_time_details: Optional[JourneyTimeDetails] = None
+    journey_time_details: JourneyTimeDetails
 
 
 class JourneySummary(BaseModel):
@@ -161,24 +161,14 @@ class JourneyFinder():
             if cached_journey == None:
                 continue
             id = int(cached_journey[15])
-            response[id] = JourneySummary(
-                outbound_details=JourneyDetails(
-                    journey_time_details=self._get_journey_time_details(cached_journey[9], JourneyDirection.OUTBOUND)),
-                return_details=JourneyDetails(journey_time_details=None if search_requests[id].return_type ==
-                                              StartType.NONE else self._get_journey_time_details(cached_journey[9], JourneyDirection.RETURN)),
-                fare_details=self._get_journey_fare_details(
-                    search_requests[id], cached_journey[9])
-            )
-
-            TrainJourneySearchResponse(
-                checked_at=cached_journey[8], data=cached_journey[9])
+            response[id] = self._response_to_summary(TrainJourneySearchResponse(
+                checked_at=cached_journey[8], data=cached_journey[9]))
             found_in_cache.append(id)
         async with aiohttp.ClientSession() as session:
             futures = []
             for i in range(len(response)):
                 if response[i] != None:
                     continue
-                # print(f"Submitting search for {search_requests[i].origin}")
                 futures.append(asyncio.ensure_future(self._do_post_request(
                     session, JourneyFinder._HEADERS, self._get_journey_api_request_body(search_requests[i]), i)))
             for result in await asyncio.gather(*futures):
@@ -187,19 +177,34 @@ class JourneyFinder():
                     continue
                 looked_up.append(result[0])
                 to_cache.append((search_requests[result[0]], result[1]))
-                response[result[0]] = JourneySummary(
-                    outbound_details=JourneyDetails(
-                        journey_time_details=self._get_journey_time_details(result[1].data, JourneyDirection.OUTBOUND)),
-                    return_details=JourneyDetails(journey_time_details=None if search_requests[result[0]].return_type ==
-                                                  StartType.NONE else self._get_journey_time_details(result[1].data, JourneyDirection.RETURN)),
-                    fare_details=self._get_journey_fare_details(
-                        search_requests[result[0]], result[1].data))
+                response[result[0]] = self._response_to_summary(result[1])
 
         print(
             f"Found journeys cached={len(found_in_cache)} looked_up={len(looked_up)} not_found={len(not_found)}")
         if to_cache:
             await self._cache_journey(to_cache)
         return response
+
+    async def get_journey_summary(self, search_request: TrainJourneySearchRequest) -> JourneySummary | None:
+        journey = await self.search(search_request)
+        if journey == None:
+            return None
+        return self._response_to_summary(journey)
+
+    def _response_to_summary(self, search_response: TrainJourneySearchResponse) -> JourneySummary | None:
+        outbound_time_summary = self._get_journey_time_details(
+            search_response.data, JourneyDirection.OUTBOUND)
+        if outbound_time_summary == None:
+            return None
+        return_time_summary = self._get_journey_time_details(
+            search_response.data, JourneyDirection.RETURN)
+        fare_details = self._get_journey_fare_details(search_response.data)
+        return JourneySummary(
+            outbound_details=JourneyDetails(
+                journey_time_details=outbound_time_summary),
+            return_details=None if return_time_summary == None else JourneyDetails(
+                journey_time_details=return_time_summary),
+            fare_details=fare_details)
 
     async def _do_post_request(self, session: ClientSession, headers: dict[str, str], body: dict, id):
         async with session.post(JourneyFinder._ENDPOINT, headers=headers, data=json.dumps(body)) as response:
@@ -210,28 +215,17 @@ class JourneyFinder():
                 print("Non JSON response")
                 print(await response.text())
                 return (id, None)
-            await asyncio.sleep(0)
             return (id, TrainJourneySearchResponse(checked_at=datetime.now(), data=await response.json()))
 
-    async def get_journey_summary(self, search_request: TrainJourneySearchRequest) -> JourneySummary | None:
-        journey = await self.search(search_request)
-        if journey == None:
-            return None
-        return JourneySummary(
-            outbound_details=JourneyDetails(
-                journey_time_details=self._get_journey_time_details(journey.data, JourneyDirection.OUTBOUND)),
-            return_details=JourneyDetails(journey_time_details=None if search_request.return_type ==
-                                          StartType.NONE else self._get_journey_time_details(journey.data, JourneyDirection.RETURN)),
-            fare_details=self._get_journey_fare_details(
-                search_request, journey.data)
-        )
-
-    def _get_journey_time_details(self, data: dict, direction: JourneyDirection) -> JourneyTimeDetails:
+    def _get_journey_time_details(self, data: dict, direction: JourneyDirection) -> JourneyTimeDetails | None:
         durations = []
         times = []
         min_changes = None
         max_changes = None
-        for journey in data["outwardJourneys" if direction == JourneyDirection.OUTBOUND else "inwardJourneys"]:
+        direction_field = "outwardJourneys" if direction == JourneyDirection.OUTBOUND else "inwardJourneys"
+        if direction_field not in data:
+            return None
+        for journey in data[direction_field]:
             duration = 0
             for durationPart in journey["duration"].split(" "):
                 durationNumber = int(re.match(r'\d+', durationPart)[0])
@@ -276,12 +270,16 @@ class JourneyFinder():
         else:
             return None
 
-    def _get_journey_fare_details(self, search_request: TrainJourneySearchRequest, data: dict) -> JourneyFareDetails:
+    def _get_journey_fare_details(self, data: dict) -> JourneyFareDetails:
         return_fares = []
         outbound_single_fares = []
         inbound_single_fares = []
-
-        for journey in (data["outwardJourneys"] + ([] if not search_request.is_return_journey() else data["inwardJourneys"])):
+        journeys = []
+        if "outwardJourneys" in data:
+            journeys += data["outwardJourneys"]
+        if "inwardJourneys" in data:
+            journeys += data["inwardJourneys"]
+        for journey in journeys:
             for fare in journey["fares"]:
                 fare_details = Fare(
                     price=fare["totalPrice"], type=fare["typeDescription"], direction=fare["direction"])
