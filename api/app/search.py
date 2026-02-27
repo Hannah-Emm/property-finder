@@ -3,7 +3,7 @@ from typing import Optional, Annotated
 from fastapi import Depends, Request
 from .journey import StartType, DayOfWeek
 from .db import DBConnection, db_conn_returns
-from .property import PropertyFinderInstance, PropertyNearStationSearchRequest, Station, Property
+from .property import PropertyFinderInstance, PropertyNearStationSearchRequest, Station, Property, PropertyStationGroup
 from .journey import JourneyFinderInstance, JourneyFinder, TrainJourneySearchRequest, JourneySummary, TrainjourneyOptions
 
 
@@ -12,10 +12,8 @@ class MatchingPropertySearchRequest(PropertyNearStationSearchRequest, Trainjourn
     destination: str
 
 
-class PropertyGroup(BaseModel):
-    station: str
+class PropertyStationGroupDetails(PropertyStationGroup):
     journey_summary: JourneySummary
-    properties: list[Property]
 
 
 class Search():
@@ -25,15 +23,15 @@ class Search():
         self.journey_finder = journey_finder
         self.request = request
 
-    async def search(self, search_request: MatchingPropertySearchRequest) -> list[PropertyGroup]:
+    async def search(self, search_request: MatchingPropertySearchRequest) -> list[PropertyStationGroup]:
         results = []
         print(f"Searching for properties matching {search_request}")
         properties = await self.property_finder.find_properties_near_stations(search_request)
-        print(f"Found properties around {len(properties.keys())} stations")
+        print(f"Found properties around {len(properties)} stations")
         requests = []
-        for station in sorted(properties):
+        for group in properties:
             requests.append(TrainJourneySearchRequest(
-                origin=station,
+                origin=group.station.id,
                 destination=search_request.destination,
                 start_time=search_request.start_time,
                 start_type=search_request.start_type,
@@ -43,9 +41,8 @@ class Search():
                 rail_card=search_request.rail_card
             ))
         journeys = await self.journey_finder.batch_search(requests)
-        stations = sorted(properties.keys())
-        for i in range(len(stations)):
-            station = stations[i]
+        for i in range(len(properties)):
+            station = properties[i].station
             journey = journeys[i]
             if journey == None or journey.outbound_details == None or journey.outbound_details.journey_time_details == None:
                 continue
@@ -55,8 +52,8 @@ class Search():
             has_acceptable_return_journey = search_request.return_type == StartType.NONE or (
                 has_return_journey and journey.return_details.journey_time_details.fastest_time <= search_request.max_journey_time)
             if has_acceptable_outbound_jourey and has_acceptable_return_journey:
-                results.append(PropertyGroup(
-                    station=station, journey_summary=journey, properties=properties[station]))
+                results.append(PropertyStationGroupDetails(
+                    station=station, journey_summary=journey, properties=properties[i].properties))
         return results
 
 

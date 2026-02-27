@@ -207,7 +207,7 @@ class JourneyFinder():
             fare_details=fare_details)
 
     async def _do_post_request(self, session: ClientSession, headers: dict[str, str], body: dict, id):
-        async with session.post(JourneyFinder._ENDPOINT, headers=headers, data=json.dumps(body)) as response:
+        async with session.post(JourneyFinder._ENDPOINT, headers=headers, json=body) as response:
             if response.status == 400:
                 print("Bad request")
                 return (id, None)
