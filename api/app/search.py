@@ -5,11 +5,6 @@ from .journey import StartType, DayOfWeek
 from .db import DBConnection, db_conn_returns
 from .property import PropertyFinderInstance, PropertyNearStationSearchRequest, Station, Property
 from .journey import JourneyFinderInstance, JourneyFinder, TrainJourneySearchRequest, JourneySummary, TrainjourneyOptions
-import concurrent.futures
-from psycopg_pool import AsyncConnectionPool
-from itertools import batched
-import pprint
-import asyncio
 
 
 class MatchingPropertySearchRequest(PropertyNearStationSearchRequest, TrainjourneyOptions):
@@ -33,9 +28,7 @@ class Search():
     async def search(self, search_request: MatchingPropertySearchRequest) -> list[PropertyGroup]:
         results = []
         print(f"Searching for properties matching {search_request}")
-        property_search_request = PropertyNearStationSearchRequest(
-            max_price=search_request.max_price, max_station_distance=search_request.max_station_distance)
-        properties = await self.property_finder.find_properties_near_stations(property_search_request)
+        properties = await self.property_finder.find_properties_near_stations(search_request)
         print(f"Found properties around {len(properties.keys())} stations")
         requests = []
         for station in sorted(properties):
