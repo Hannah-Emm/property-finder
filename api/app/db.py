@@ -25,6 +25,11 @@ async def db_conn(request: Request) -> AsyncGenerator[Connection]:
         yield conn
 
 
+async def db_conn_returns(request: Request) -> Connection:
+    async with request.state.db_pool.connection() as conn:
+        return conn
+
+
 async def db_execute(connection: Connection, sql: str, args: list[Any] | None = None) -> None:
     async with connection.cursor() as cursor:
         await cursor.execute(sql, args)
@@ -41,4 +46,17 @@ async def db_fetch_all(connection: Connection, sql: str, args: list[Any] | None 
         await cursor.execute(sql, args)
         return await cursor.fetchall()
 
+
+async def db_execute_many(connection: Connection, sql: str, args: list[Any] | None = None) -> None:
+    async with connection.cursor() as cursor:
+        await cursor.executemany(sql, args, returning=True)
+
+
+async def db_execute_many_fetch(connection: Connection, sql: str, args: list[Any] | None = None) -> list[tuple[Any, ...]]:
+    results = []
+    async with connection.cursor() as cursor:
+        await cursor.executemany(sql, args, returning=True)
+        async for _ in cursor.results():
+            results.append(await cursor.fetchone())
+    return results
 type DBConnection = Annotated[Connection, Depends(db_conn)]

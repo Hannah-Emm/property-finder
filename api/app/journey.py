@@ -8,7 +8,10 @@ import re
 from fastapi import Depends
 from typing import Annotated, Optional
 from pydantic import BaseModel
-from .db import DBConnection, db_fetch_one, db_execute
+from .db import DBConnection, db_fetch_one, db_execute, db_execute_many, db_execute_many_fetch
+import aiohttp
+import asyncio
+import json
 
 
 class JourneyDirection(str, Enum):
@@ -95,11 +98,18 @@ class TrainJourneySearchResponse(BaseModel):
 class JourneyFinder():
     _ENDPOINT = "https://jpservices.nationalrail.co.uk/journey-planner"
     _HEADERS = {
-        "Accept-Encoding": "gzip, deflate"
+        "Accept-Encoding": "gzip, deflate",
+        "Content-Type": "application/json"
     }
     _DATE_FORMAT = "%Y-%m-%d"
     _GET_CACHED_JOURNEY_QUERY_TEMPLATE = """
             select checked_at, data from journeys 
+            where origin=%s and destination=%s and start_time=%s and start_type=%s and return_time=%s and return_type=%s and day_of_week=%s and rail_card=%s
+            """
+    _GET_CACHED_JOURNEYS_QUERY_TEMPLATE = """
+            select origin, destination, to_char(start_time, 'HH24:MI:SS'), start_type, to_char(return_time, 'HH24:MI:SS'), return_type, day_of_week, rail_card, checked_at, data, s.id, s.name, s.location, ST_X(s.location::geometry), ST_Y(s.location::geometry), %s as "search_id"
+            from journeys as "j" join stations as "s"
+            on s.id=j.origin
             where origin=%s and destination=%s and start_time=%s and start_type=%s and return_time=%s and return_type=%s and day_of_week=%s and rail_card=%s
             """
     _CACHE_JOURNEY_QUERY_TEMPLATE = """
@@ -120,8 +130,88 @@ class JourneyFinder():
             if response == None or response.data == None:
                 return None
             # update or store in db
-            await self._cache_journey(search_request, response)
+            await self._cache_journey([(search_request, response)])
         return response
+
+    async def batch_search(self, search_requests: list[TrainJourneySearchRequest]) -> list[TrainJourneySearchResponse | None]:
+        response = [None] * len(search_requests)
+        found_in_cache = []
+        looked_up = []
+        not_found = []
+        to_cache = []
+        request_args = []
+        for i in range(len(search_requests)):
+            request_args.append([
+                i,
+                search_requests[i].origin,
+                search_requests[i].destination,
+                search_requests[i].start_time,
+                search_requests[i].start_type,
+                search_requests[i].return_time,
+                search_requests[i].return_type,
+                search_requests[i].day_of_week,
+                search_requests[i].rail_card
+            ])
+        cached_journeys = await db_execute_many_fetch(
+            self.connection,
+            JourneyFinder._GET_CACHED_JOURNEYS_QUERY_TEMPLATE,
+            request_args
+        )
+        for cached_journey in cached_journeys:
+            if cached_journey == None:
+                continue
+            id = int(cached_journey[15])
+            response[id] = JourneySummary(
+                outbound_details=JourneyDetails(
+                    journey_time_details=self._get_journey_time_details(cached_journey[9], JourneyDirection.OUTBOUND)),
+                return_details=JourneyDetails(journey_time_details=None if search_requests[id].return_type ==
+                                              StartType.NONE else self._get_journey_time_details(cached_journey[9], JourneyDirection.RETURN)),
+                fare_details=self._get_journey_fare_details(
+                    search_requests[id], cached_journey[9])
+            )
+
+            TrainJourneySearchResponse(
+                checked_at=cached_journey[8], data=cached_journey[9])
+            found_in_cache.append(id)
+        async with aiohttp.ClientSession() as session:
+            futures = []
+            for i in range(len(response)):
+                if response[i] != None:
+                    continue
+                # print(f"Submitting search for {search_requests[i].origin}")
+                futures.append(asyncio.ensure_future(self._do_post_request(
+                    session, JourneyFinder._HEADERS, self._get_journey_api_request_body(search_requests[i]), i)))
+            for result in await asyncio.gather(*futures):
+                if result[1] == None:
+                    not_found.append(result[0])
+                    continue
+                looked_up.append(result[0])
+                to_cache.append((search_requests[result[0]], result[1]))
+                response[result[0]] = JourneySummary(
+                    outbound_details=JourneyDetails(
+                        journey_time_details=self._get_journey_time_details(result[1].data, JourneyDirection.OUTBOUND)),
+                    return_details=JourneyDetails(journey_time_details=None if search_requests[result[0]].return_type ==
+                                                  StartType.NONE else self._get_journey_time_details(result[1].data, JourneyDirection.RETURN)),
+                    fare_details=self._get_journey_fare_details(
+                        search_requests[result[0]], result[1].data))
+
+        print(
+            f"Found journeys cached={len(found_in_cache)} looked_up={len(looked_up)} not_found={len(not_found)}")
+        if to_cache:
+            await self._cache_journey(to_cache)
+        return response
+
+    async def _do_post_request(self, session: ClientSession, headers: dict[str, str], body: dict, id):
+        async with session.post(JourneyFinder._ENDPOINT, headers=headers, data=json.dumps(body)) as response:
+            if response.status == 400:
+                print("Bad request")
+                return (id, None)
+            elif response.headers["content-type"] != "application/json":
+                print("Non JSON response")
+                print(await response.text())
+                return (id, None)
+            await asyncio.sleep(0)
+            return (id, TrainJourneySearchResponse(checked_at=datetime.now(), data=await response.json()))
 
     async def get_journey_summary(self, search_request: TrainJourneySearchRequest) -> JourneySummary | None:
         journey = await self.search(search_request)
@@ -236,7 +326,7 @@ class JourneyFinder():
             return TrainJourneySearchResponse(checked_at=cached_journey[0], data=cached_journey[1])
         return None
 
-    def _get_journey_from_api(self, search_request: TrainJourneySearchRequest) -> TrainJourneySearchResponse | None:
+    def _get_journey_api_request_body(self, search_request: TrainJourneySearchRequest) -> dict:
         today = datetime.today()
         current_week_day = today.weekday() + 1 if today.weekday() < 6 else 0
         if current_week_day < search_request.day_of_week.value:
@@ -272,31 +362,37 @@ class JourneyFinder():
             api_request_body["inwardTime"] = {
                 "travelTime": inward_time, "type": search_request.return_type.name}
 
+        return api_request_body
+
+    def _get_journey_from_api(self, search_request: TrainJourneySearchRequest) -> TrainJourneySearchResponse | None:
         api_response = requests.post(
-            JourneyFinder._ENDPOINT, json=api_request_body, headers=JourneyFinder._HEADERS)
+            JourneyFinder._ENDPOINT, json=self._get_journey_api_request_body(search_request), headers=JourneyFinder._HEADERS)
 
         if api_response.status_code == 400:
             print("Bad request for ", search_request)
             return None
         return TrainJourneySearchResponse(checked_at=datetime.now(), data=api_response.json())
 
-    async def _cache_journey(self, search_request: TrainJourneySearchRequest, search_result: TrainJourneySearchResponse) -> None:
-        await db_execute(
+    async def _cache_journey(self, journeys: list[tuple[TrainJourneySearchRequest, TrainJourneySearchResponse]]) -> None:
+        args = []
+        for journey in journeys:
+            args.append([
+                journey[0].origin,
+                journey[0].destination,
+                journey[0].start_time,
+                journey[0].start_type,
+                (journey[0].return_time if journey[0].return_time !=
+                 None else "00:00:00"),
+                (journey[0].return_type if journey[0].return_time !=
+                 None else StartType.NONE),
+                journey[0].day_of_week,
+                journey[0].rail_card,
+                json.dumps(journey[1].data)
+            ])
+        await db_execute_many(
             self.connection,
             JourneyFinder._CACHE_JOURNEY_QUERY_TEMPLATE,
-            [
-                search_request.origin,
-                search_request.destination,
-                search_request.start_time,
-                search_request.start_type,
-                (search_request.return_time if search_request.return_time !=
-                 None else "00:00:00"),
-                (search_request.return_type if search_request.return_time !=
-                 None else StartType.NONE),
-                search_request.day_of_week,
-                search_request.rail_card,
-                json.dumps(search_result.data)
-            ]
+            args
         )
 
 
