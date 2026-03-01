@@ -33,32 +33,6 @@
                 </span>
                 <span class="form_input_group">
                     <span class="form_input">
-                        <label for="start_time">Journey start time</label>
-                        <input id="start_time" x-model="start_time" type="text" placeholder="start time">
-                    </span>
-                    <span class="form_input">
-                        <label for="start_time">Journey start time type</label>
-                        <input id="start_type" x-model="start_type" type="text" placeholder="start type">
-                    </span>
-                    <span class="form_input">
-                        <label for="return_time">Journey return time</label>
-                        <input id="return_time" x-model="return_time" type="text" placeholder="return time">
-                    </span>
-                    <span class="form_input">
-                        <label for="return_type">Journey return time type</label>
-                        <input id="return_type" x-model="return_type" type="text" placeholder="return type">
-                    </span>
-                    <span class="form_input">
-                        <label for="day_of_week">Journey day</label>
-                        <input id="day_of_week" x-model.number="day_of_week" type="number" placeholder="day of week">
-                    </span>
-                    <span class="form_input">
-                        <label for="rail_card">Rail card type</label>
-                        <input id="rail_card" x-model="rail_card" type="text" placeholder="rail card">
-                    </span>
-                </span>
-                <span class="form_input_group">
-                    <span class="form_input">
                         <label for="min_price">Min price</label>
                         <input id="min_price" x-model.number="min_price" type="number" placeholder="min price">
                     </span>
@@ -73,6 +47,50 @@
                     <span class="form_input">
                         <label for="max_bedrooms">Max bedrooms</label>
                         <input id="max_bedrooms" x-model.number="max_bedrooms" type="number" placeholder="max bedrooms">
+                    </span>
+                </span>
+                <span class="form_input_group">
+                    <span class="form_input">
+                        <label for="start_time">Journey start time</label>
+                        <input id="start_time" x-model="start_time" type="text" placeholder="start time">
+                    </span>
+                    <span class="form_input">
+                        <label for="start_type">Journey start time type</label>
+                        <span>
+                            Depart<input id="start_type" x-model="start_type" type="radio" value="DEPART">
+                        </span>
+                        <span>
+                            Arrive<input id="start_type" x-model="start_type" type="radio" value="ARRIVE">
+                        </span>
+                    </span>
+                    <span class="form_input">
+                        <label for="return_time">Journey return time</label>
+                        <input id="return_time" x-model="return_time" type="text" placeholder="return time">
+                    </span>
+                    <span class="form_input">
+                        <label for="return_type">Journey return time type</label>
+                        <span>
+                            Depart<input id="return_type" x-model="return_type" type="radio" value="DEPART">
+                        </span>
+                        <span>
+                            Arrive<input id="return_type" x-model="return_type" type="radio" value="ARRIVE">
+                        </span>
+                    </span>
+                    <span class="form_input">
+                        <label for="day_of_week">Journey day</label>
+                        <select id="day_of_week" x-model.number="day_of_week" placeholder="day of week">
+                            <option value="0">SUN</option>
+                            <option value="1">MON</option>
+                            <option value="2">TUE</option>
+                            <option value="3">WED</option>
+                            <option value="4">THU</option>
+                            <option value="5">FRI</option>
+                            <option value="6">SAT</option>
+                        </select>
+                    </span>
+                    <span class="form_input">
+                        <label for="rail_card">Rail card type</label>
+                        <input id="rail_card" x-model="rail_card" type="text" placeholder="rail card">
                     </span>
                 </span>
                 <button>Search</button>
