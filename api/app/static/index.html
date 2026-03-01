@@ -105,6 +105,9 @@
                     <h4>Journey details:</h4>
                     <div class="journey_summary_container details_container">
                         <div class="details_list">
+                            <a class="details_item"
+                                x-on:click="window.open('https://www.google.com/maps/search/?api=1&query=' + property_group.station.location[1] + '%2C' + property_group.station.location[0], '_blank')">View
+                                station</a>
                             <span class="details_item"
                                 x-text="'fastest journey time: ' + property_group.journey_summary.outbound_details.journey_time_details.fastest_time + ' minutes'"></span>
                             <span class="details_item"

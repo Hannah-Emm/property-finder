@@ -4,6 +4,12 @@ body {
     color:#444
 }
 
+a {
+    cursor: pointer;
+    color:#58a6ff
+}
+
+
 .section {
     padding-left: 1em;
     padding-right: 1em;
