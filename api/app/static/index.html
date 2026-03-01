@@ -97,7 +97,7 @@
             </form>
         </div>
         <div x-cloak class="section">
-            <p x-show="loading">Searching...</p>
+            <div class="loader" x-show="loading"></div>
             <p x-show="failed">Something went wrong...</p>
             <template x-for="property_group in groups">
                 <div class="property_group_container">
@@ -173,6 +173,7 @@
 
                 search(e) {
                     console.log("Search", e)
+                    this.groups = []
                     this.loading = true
                     const options = {
                         method: 'POST',
