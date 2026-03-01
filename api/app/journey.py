@@ -12,6 +12,7 @@ from .db import DBConnection, db_fetch_one, db_execute_many, db_execute_many_fet
 import aiohttp
 import asyncio
 import json
+from time import time
 
 
 class JourneyDirection(str, Enum):
@@ -134,6 +135,7 @@ class JourneyFinder():
         return response
 
     async def batch_search(self, search_requests: list[TrainJourneySearchRequest]) -> list[TrainJourneySearchResponse | None]:
+        start_time = time()
         response = [None] * len(search_requests)
         found_in_cache = []
         looked_up = []
@@ -164,6 +166,7 @@ class JourneyFinder():
             response[id] = self._response_to_summary(TrainJourneySearchResponse(
                 checked_at=cached_journey[8], data=cached_journey[9]))
             found_in_cache.append(id)
+        cache_finish_time = time()
         async with aiohttp.ClientSession() as session:
             futures = []
             for i in range(len(response)):
@@ -178,11 +181,11 @@ class JourneyFinder():
                 looked_up.append(result[0])
                 to_cache.append((search_requests[result[0]], result[1]))
                 response[result[0]] = self._response_to_summary(result[1])
-
-        print(
-            f"Found journeys cached={len(found_in_cache)} looked_up={len(looked_up)} not_found={len(not_found)}")
+        api_fetch_finish_time = time()
         if to_cache:
             await self._cache_journey(to_cache)
+        cache_update_finish_time = time()
+        print(f"Found journeys cached={len(found_in_cache)} looked_up={len(looked_up)} not_found={len(not_found)} cache_read_time={cache_finish_time-start_time} api_request_time={api_fetch_finish_time-cache_finish_time} cache_update_time={cache_update_finish_time-api_fetch_finish_time}")
         return response
 
     async def get_journey_summary(self, search_request: TrainJourneySearchRequest) -> JourneySummary | None:
