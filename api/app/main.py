@@ -1,8 +1,10 @@
 from fastapi import FastAPI, Depends
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
-from typing import AsyncIterator, Annotated
+from typing import AsyncIterator
 from .db import get_db_connection_pool
-from .property import PropertyNearStationSearchRequest, Property, PropertyFinderInstance, PropertyStationGroup
+from .property import PropertyNearStationSearchRequest, PropertyFinderInstance, PropertyStationGroup
 from .journey import TrainJourneySearchRequest, JourneyFinderInstance, JourneySummary
 from .search import MatchingPropertySearchRequest, PropertyStationGroupDetails, SearchInstance
 
@@ -15,6 +17,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await db_pool.close()
 
 app = FastAPI(lifespan=lifespan)
+
+app.mount("/view", StaticFiles(directory="/code/app/static"), name="static")
+
+
+@app.get("/")
+async def index():
+    return RedirectResponse(url="/view/index.html", status_code=308)
 
 
 @app.post("/search/near-stations", response_model=list[PropertyStationGroup])
