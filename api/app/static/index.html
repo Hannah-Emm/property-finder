@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script defer src="https://unpkg.com/@colinaut/alpinejs-plugin-simple-validate@1/dist/alpine.validate.min.js"></script>
+        <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+        <title>Property Finder</title>
+        <style>
+            [x-cloak] { display: none !important; }
+        </style>
+    </head>
+    <body>
+        <div x-data="$store.property_groups">
+            <div x-data="search_parameters">
+                <form id="form" x-validate.validate-on-submit @submit.prevent="if ($validate.isComplete('form')) search(request_json())">
+                    <input x-validate.wholenumber x-validate.required id="max_station_distance" x-model.number="max_station_distance" type="number" placeholder="max station distance">
+                    <input x-validate.wholenumber x-validate.required id="max_journey_time" x-model.number="max_journey_time" type="number" placeholder="max journey time">
+                    <input x-validate.required id="destination" x-model="destination" type="text" placeholder="destination station">
+                    
+                    <input id="start_time" x-model="start_time" type="text" placeholder="start time">
+                    <input id="start_type" x-model="start_type" type="text" placeholder="start type">
+                    <input id="return_time" x-model="return_time" type="text" placeholder="return time">
+                    <input id="return_type" x-model="return_type" type="text" placeholder="return type">
+                    <input id="day_of_week" x-model.number="day_of_week" type="number" placeholder="day of week">
+                    <input id="rail_card" x-model="rail_card" type="text" placeholder="rail card">
+
+                    <input id="max_price" x-model.number="max_price" type="number" placeholder="max price">
+                
+                    <button>Search</button>
+                </form>
+            </div>
+            <div x-cloak>
+                <p x-show="loading">Searching...</p>
+                <p x-show="failed">Something went wrong...</p>
+                <template x-for="property_group in groups">
+                    <span>
+                        <h3 x-text="property_group.station.name"></h3>
+                        <div>
+                            <span x-text="'journey time: ' + property_group.journey_summary.outbound_details.journey_time_details.fastest_time"></span>
+                        </div>
+                        <div>
+                            <template x-for="property in property_group.properties">
+                                <div>
+                                    <span x-text="'id: ' + property.id"></span>
+                                    <span x-text="'price: £' + property.price"></span>
+                                    <span x-text="'bedrooms: ' + property.bedrooms"></span>
+                                    <span x-text="'bathrooms: ' + property.bathrooms"></span>
+                                    <span x-text="'address: ' + property.address"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </span>
+                </template>
+            </div>
+        </div>
+        <script>
+            document.addEventListener('alpine:init', () => {
+                Alpine.data("search_parameters", () => ({
+                    destination: "LST",
+                    start_time: "09:15:00",
+                    start_type: "ARRIVE",
+                    return_time: "17:30:00",
+                    return_type: "DEPART",
+                    day_of_week: 2,
+                    rail_card: "YNG",
+                    max_journey_time: 60,
+                    max_station_distance: 2000,
+                    max_price:800,
+
+                    request_json() {
+                        return {                    
+                            destination: this.destination,
+                            start_time: this.start_time,
+                            start_type: this.start_type,
+                            return_time: this.return_time,
+                            return_type: this.return_type,
+                            day_of_week: this.day_of_week,
+                            rail_card: this.rail_card,
+                            max_journey_time: this.max_journey_time,
+                            max_station_distance: this.max_station_distance,
+                            max_price: this.max_price,
+                        }
+                    }
+                }));
+
+                Alpine.store("property_groups", () => ({        
+                    groups: [],
+                    loading: false,
+                    failed: false,
+        
+                    search(e) {
+                        console.log("Search",e)
+                        this.loading = true
+                        const options = {
+                            method: 'POST',
+                            headers: {'content-type': 'application/json'},
+                            body: JSON.stringify(e)
+                        };
+                        fetch("/search/find-properties", options).then(response => {
+                            response.json().then(data => {
+                                console.log(data)
+                                this.groups = data
+                                this.loading = false
+                                this.failed = false
+                            }, error => {
+                                console.error("Failed to parse response", error)
+                                this.loading = false
+                                this.failed = true
+                            })
+                        }, error => {
+                            console.error("Failed to search", error)
+                            this.loading = false
+                            this.failed = true
+                        })
+                    }
+                }));
+            })
+        </script>
+    </body>
+</html>
