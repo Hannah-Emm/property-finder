@@ -3,3 +3,4 @@ aiohttp[speedups] == 3.13.3
 psycopg == 3.3.2
 psycopg_pool == 3.3.0
 fastapi[standard-no-fastapi-cloud-cli] == 0.132.0
+APScheduler == 3.11.2
