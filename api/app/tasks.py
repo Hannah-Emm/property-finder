@@ -15,7 +15,7 @@ _HEADERS = {
 }
 
 
-async def fetch_properties(connection):
+async def fetch_properties(db_pool) -> None:
     print("Fetching properties")
     index = 0
     next = None
@@ -33,7 +33,8 @@ async def fetch_properties(connection):
                     properties += data['properties']
     if properties:
         print(f"Found {len(properties)} properties")
-        await store_properties(connection, properties)
+        async with db_pool.connection() as connection:
+            await store_properties(connection, properties)
     else:
         print("No properties found")
 

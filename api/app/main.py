@@ -17,10 +17,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await db_pool.open()
     scheduler = AsyncIOScheduler()
     scheduler.start()
-    async with db_pool.connection() as db_connection:
-        scheduler.add_job(fetch_properties, 'interval', minutes=60, args=[
-                          db_connection], misfire_grace_time=None)
-        yield {"db_pool": db_pool}
+    scheduler.add_job(fetch_properties, 'interval', minutes=1, args=[
+                        db_pool], misfire_grace_time=None)
+    yield {"db_pool": db_pool}
     scheduler.shutdown()
     await db_pool.close()
 
