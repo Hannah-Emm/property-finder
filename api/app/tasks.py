@@ -1,11 +1,10 @@
-from .db import db_execute_many
+from .db import db_execute_many, db_fetch_one, db_fetch_all
 import aiohttp
 
 _BASE_URL = "https://www.rightmove.co.uk/api/property-search/listing/search"
 _PARAMS = {
     "locationIdentifier": "USERDEFINEDAREA^{\"polylines\":\"mdluHuovH~~c@|xeA?x|_D?dmwO?djwC?bbqD_waApknAyow@t{Zynh@rcA}fpC}re@ooqDijp@_|rBkso@?wehJ?sjfD?w|fG|oqAezcBj}b@gvpBr{z@uxpCtzwBbjTzkiFh|i@px`@hdP\"}",
     "channel": "RENT",
-    "sortType": "6",
     "transactionType": "LETTING",
     "dontShow": "houseShare,retirement,student"
 }
@@ -20,17 +19,21 @@ async def fetch_properties(db_pool) -> None:
     index = 0
     next = None
     properties = []
+    data = None
     async with aiohttp.ClientSession() as session:
         while (index != next):
             if next != None:
                 index = next
             _PARAMS["index"] = index
+            print(_PARAMS["index"])
             async with session.get(_BASE_URL, headers=_HEADERS, params=_PARAMS) as response:
+                print(response.url)
                 data = await response.json()
                 if "pagination" in data and "next" in data["pagination"]:
                     next = int(data["pagination"]["next"])
                 if "properties" in data:
                     properties += data['properties']
+    print(data["pagination"])
     if properties:
         print(f"Found {len(properties)} properties")
         async with db_pool.connection() as connection:
@@ -39,12 +42,14 @@ async def fetch_properties(db_pool) -> None:
         print("No properties found")
 
 
-async def store_properties(connection, propertiesJson):
+async def store_properties(connection, propertiesJson) -> None:
     if not propertiesJson:
         return
     properties = []
+    ids = []
     for property in propertiesJson:
         id = property["id"]
+        ids.append(id)
         longitude = property["location"]["longitude"]
         latitude = property["location"]["latitude"]
         location = f"point({longitude} {latitude})"
@@ -63,7 +68,18 @@ async def store_properties(connection, propertiesJson):
     address = EXCLUDED.address,
     price = EXCLUDED.price,
     bedrooms = EXCLUDED.bedrooms,
-    bathrooms = EXCLUDED.bathrooms
+    bathrooms = EXCLUDED.bathrooms,
+    historic = false
     """,
                           properties)
+
     print("Stored {} properties".format(len(properties)))
+
+    old_properties_count = await db_fetch_one(connection, """
+    with rows as (
+        update properties set historic=true where historic=false and not (id = ANY(%s))
+        returning OLD.id
+    ) select count(1) from rows
+    """, [ids])
+
+    print(f"Marked {old_properties_count[0]} properties as historic")

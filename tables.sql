@@ -4,7 +4,8 @@ create table properties (
     address text,
     price integer not null,
     bedrooms smallint,
-    bathrooms smallint
+    bathrooms smallint,
+    boolean historic default false
 );
 
 create table stations (
