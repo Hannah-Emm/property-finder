@@ -7,13 +7,20 @@ from .db import get_db_connection_pool
 from .property import PropertyNearStationSearchRequest, PropertyFinderInstance, PropertyStationGroup
 from .journey import TrainJourneySearchRequest, JourneyFinderInstance, JourneySummary
 from .search import MatchingPropertySearchRequest, PropertyStationGroupDetails, SearchInstance
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from .tasks import fetch_properties_by_stations
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     db_pool = get_db_connection_pool()
     await db_pool.open()
+    scheduler = AsyncIOScheduler()
+    scheduler.start()
+    scheduler.add_job(fetch_properties_by_stations, 'interval', minutes=60, args=[
+                        db_pool], misfire_grace_time=None)
     yield {"db_pool": db_pool}
+    scheduler.shutdown()
     await db_pool.close()
 
 app = FastAPI(lifespan=lifespan)

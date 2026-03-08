@@ -2,9 +2,10 @@ create table properties (
     id bigint not null primary key,
     location geography(Point) not null,
     address text,
-    price smallint not null,
+    price integer not null,
     bedrooms smallint,
-    bathrooms smallint
+    bathrooms smallint,
+    boolean historic default false
 );
 
 create table stations (
