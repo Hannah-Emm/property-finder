@@ -49,7 +49,7 @@ async def db_fetch_all(connection: Connection, sql: str, args: list[Any] | None 
 
 async def db_execute_many(connection: Connection, sql: str, args: list[Any] | None = None) -> None:
     async with connection.cursor() as cursor:
-        await cursor.executemany(sql, args, returning=True)
+        await cursor.executemany(sql, args)
 
 
 async def db_execute_many_fetch(connection: Connection, sql: str, args: list[Any] | None = None) -> list[tuple[Any, ...]]:
