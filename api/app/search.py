@@ -5,6 +5,7 @@ from .journey import StartType, DayOfWeek
 from .db import DBConnection, db_conn_returns
 from .property import PropertyFinderInstance, PropertyNearStationSearchRequest, Station, Property, PropertyStationGroup
 from .journey import JourneyFinderInstance, JourneyFinder, TrainJourneySearchRequest, JourneySummary, TrainjourneyOptions
+from .user import CurrentUser
 
 
 class MatchingPropertySearchRequest(PropertyNearStationSearchRequest, TrainjourneyOptions):
@@ -23,10 +24,10 @@ class Search():
         self.journey_finder = journey_finder
         self.request = request
 
-    async def search(self, search_request: MatchingPropertySearchRequest) -> list[PropertyStationGroup]:
+    async def search(self, search_request: MatchingPropertySearchRequest, user: CurrentUser) -> list[PropertyStationGroup]:
         results = []
         print(f"Searching for properties matching {search_request}")
-        properties = await self.property_finder.find_properties_near_stations(search_request)
+        properties = await self.property_finder.find_properties_near_stations(search_request, user)
         print(f"Found properties around {len(properties)} stations")
         requests = []
         for group in properties:

@@ -9,130 +9,245 @@
     <title>Property Finder</title>
 </head>
 
-<body>
-    <div x-data="$store.property_groups">
-        <div x-data="search_parameters" class="search_bar section">
-            <form id="form" class="search_form" x-validate.validate-on-submit
-                @submit.prevent="if ($validate.isComplete('form')) search(request_json())">
+<body x-data>
+    <template x-if="!$store.router.logged_in">
+        <span>
+            <p>Log in</p>
+            <p x-show="$store.router.error != null" x-text="$store.router.error"></p>
+            <form x-data id="login_form" x-validate.validate-on-submit
+                @submit.prevent="if ($validate.isComplete('login_form')) $store.router.login()">
                 <span class="form_input_group">
                     <span class="form_input">
-                        <label for="max_station_distance">Distance from station (meters)</label>
-                        <input x-validate.wholenumber x-validate.required id="max_station_distance"
-                            x-model.number="max_station_distance" type="number" placeholder="max station distance">
+                        <label for="username">Username</label>
+                        <input x-validate.required id="username" x-model="$store.router.username" type="text"
+                            placeholder="username">
                     </span>
                     <span class="form_input">
-                        <label for="max_journey_time">Max journey time (minutes)</label>
-                        <input x-validate.wholenumber x-validate.required id="max_journey_time"
-                            x-model.number="max_journey_time" type="number" placeholder="max journey time">
-                    </span>
-                    <span class="form_input">
-                        <label for="destination">Destination station</label>
-                        <input x-validate.required id="destination" x-model="destination" type="text"
-                            placeholder="destination station">
+                        <label for="password">Password</label>
+                        <input x-validate.required id="password" x-model="$store.router.password" type="password"
+                            placeholder="password">
                     </span>
                 </span>
-                <span class="form_input_group">
-                    <span class="form_input">
-                        <label for="min_price">Min price</label>
-                        <input id="min_price" x-model.number="min_price" type="number" placeholder="min price">
-                    </span>
-                    <span class="form_input">
-                        <label for="max_price">Max price</label>
-                        <input id="max_price" x-model.number="max_price" type="number" placeholder="max price">
-                    </span>
-                    <span class="form_input">
-                        <label for="min_bedrooms">Min bedrooms</label>
-                        <input id="min_bedrooms" x-model.number="min_bedrooms" type="number" placeholder="min bedrooms">
-                    </span>
-                    <span class="form_input">
-                        <label for="max_bedrooms">Max bedrooms</label>
-                        <input id="max_bedrooms" x-model.number="max_bedrooms" type="number" placeholder="max bedrooms">
-                    </span>
-                </span>
-                <span class="form_input_group">
-                    <span class="form_input">
-                        <label for="start_time">Journey start time</label>
-                        <input id="start_time" x-model="start_time" type="text" placeholder="start time">
-                    </span>
-                    <span class="form_input">
-                        <label for="start_type">Journey start time type</label>
-                        <span>
-                            Depart<input id="start_type" x-model="start_type" type="radio" value="DEPART">
-                        </span>
-                        <span>
-                            Arrive<input id="start_type" x-model="start_type" type="radio" value="ARRIVE">
-                        </span>
-                    </span>
-                    <span class="form_input">
-                        <label for="return_time">Journey return time</label>
-                        <input id="return_time" x-model="return_time" type="text" placeholder="return time">
-                    </span>
-                    <span class="form_input">
-                        <label for="return_type">Journey return time type</label>
-                        <span>
-                            Depart<input id="return_type" x-model="return_type" type="radio" value="DEPART">
-                        </span>
-                        <span>
-                            Arrive<input id="return_type" x-model="return_type" type="radio" value="ARRIVE">
-                        </span>
-                    </span>
-                    <span class="form_input">
-                        <label for="day_of_week">Journey day</label>
-                        <select id="day_of_week" x-model.number="day_of_week" placeholder="day of week">
-                            <option value="0">SUN</option>
-                            <option value="1">MON</option>
-                            <option value="2">TUE</option>
-                            <option value="3">WED</option>
-                            <option value="4">THU</option>
-                            <option value="5">FRI</option>
-                            <option value="6">SAT</option>
-                        </select>
-                    </span>
-                    <span class="form_input">
-                        <label for="rail_card">Rail card type</label>
-                        <input id="rail_card" x-model="rail_card" type="text" placeholder="rail card">
-                    </span>
-                </span>
-                <button>Search</button>
+                <button>Login</button>
             </form>
-        </div>
-        <div x-cloak class="section">
-            <div class="loader" x-show="loading"></div>
-            <p x-show="failed">Something went wrong...</p>
-            <template x-for="property_group in groups">
-                <div class="property_group_container">
-                    <h3 x-text="property_group.station.name" class="property_group_heading"></h3>
-                    <h4>Journey details:</h4>
-                    <div class="journey_summary_container details_container">
+        </span>
+    </template>
+    <template x-if="$store.router.logged_in && $store.router.route=='stared'">
+        <span x-data="stared">
+            <button x-on:click="$store.router.route='search'">Back to search</button>
+            <div class="property_group_container">
+                <h3 class="property_group_heading">Stared properties</h3>
+                <template x-for="(property, property_index) in properties" :key="property.id">
+                    <div class="property_details_container details_container">
                         <div class="details_list">
+                            <button x-show="property.star" x-on:click="remove_star(property.id, property_index)">Remove
+                                star</button>
                             <a class="details_item"
-                                x-on:click="window.open('https://www.google.com/maps/search/?api=1&query=' + property_group.station.location[1] + '%2C' + property_group.station.location[0], '_blank')">View
-                                station</a>
-                            <span class="details_item"
-                                x-text="'fastest journey time: ' + property_group.journey_summary.outbound_details.journey_time_details.fastest_time + ' minutes'"></span>
-                            <span class="details_item"
-                                x-text="'average wait time: ' + property_group.journey_summary.outbound_details.journey_time_details.average_wait + ' minutes'"></span>
+                                x-on:click="window.open('https://www.rightmove.co.uk/properties/' + property.id, '_blank')">View
+                                on RightMove</a>
+                            <span class="details_item" x-text="'price: £' + property.price"></span>
+                            <span class="details_item" x-text="'bedrooms: ' + property.bedrooms"></span>
+                            <span class="details_item" x-text="'bathrooms: ' + property.bathrooms"></span>
+                            <span class="details_item" x-text="'address: ' + property.address"></span>
                         </div>
                     </div>
-                    <h4>Properties:</h4>
-                    <template x-for="property in property_group.properties">
-                        <div class="property_details_container details_container"
-                            x-on:click="window.open('https://www.rightmove.co.uk/properties/' + property.id, '_blank')">
-                            <div class="details_list">
-                                <span class="details_item" x-text="'price: £' + property.price"></span>
-                                <span class="details_item" x-text="'bedrooms: ' + property.bedrooms"></span>
-                                <span class="details_item" x-text="'bathrooms: ' + property.bathrooms"></span>
-                                <span class="details_item" x-text="'address: ' + property.address"></span>
+                </template>
+            </div>
+        </span>
+    </template>
+    <template x-if="$store.router.logged_in && $store.router.route=='search'">
+        <span>
+            <button x-on:click="$store.router.route='stared'">View stared properties</button>
+            <div x-data="property_groups">
+                <div class="search_bar section">
+                    <form id="form" class="search_form" x-validate.validate-on-submit
+                        @submit.prevent="if ($validate.isComplete('form')) search($store.search_parameters.request_json())">
+                        <span class="form_input_group">
+                            <span class="form_input">
+                                <label for="max_station_distance">Distance from station (meters)</label>
+                                <input x-validate.wholenumber x-validate.required id="max_station_distance"
+                                    x-model.number="$store.search_parameters.max_station_distance" type="number"
+                                    placeholder="max station distance">
+                            </span>
+                            <span class="form_input">
+                                <label for="max_journey_time">Max journey time (minutes)</label>
+                                <input x-validate.wholenumber x-validate.required id="max_journey_time"
+                                    x-model.number="$store.search_parameters.max_journey_time" type="number"
+                                    placeholder="max journey time">
+                            </span>
+                            <span class="form_input">
+                                <label for="destination">Destination station</label>
+                                <input x-validate.required id="destination"
+                                    x-model="$store.search_parameters.destination" type="text"
+                                    placeholder="destination station">
+                            </span>
+                        </span>
+                        <span class="form_input_group">
+                            <span class="form_input">
+                                <label for="min_price">Min price</label>
+                                <input id="min_price" x-model.number="$store.search_parameters.min_price" type="number"
+                                    placeholder="min price">
+                            </span>
+                            <span class="form_input">
+                                <label for="max_price">Max price</label>
+                                <input id="max_price" x-model.number="$store.search_parameters.max_price" type="number"
+                                    placeholder="max price">
+                            </span>
+                            <span class="form_input">
+                                <label for="min_bedrooms">Min bedrooms</label>
+                                <input id="min_bedrooms" x-model.number="$store.search_parameters.min_bedrooms"
+                                    type="number" placeholder="min bedrooms">
+                            </span>
+                            <span class="form_input">
+                                <label for="max_bedrooms">Max bedrooms</label>
+                                <input id="max_bedrooms" x-model.number="$store.search_parameters.max_bedrooms"
+                                    type="number" placeholder="max bedrooms">
+                            </span>
+                        </span>
+                        <span class="form_input_group">
+                            <span class="form_input">
+                                <label for="start_time">Journey start time</label>
+                                <input id="start_time" x-model="$store.search_parameters.start_time" type="text"
+                                    placeholder="start time">
+                            </span>
+                            <span class="form_input">
+                                <label for="start_type">Journey start time type</label>
+                                <span>
+                                    Depart<input id="start_type" x-model="$store.search_parameters.start_type"
+                                        type="radio" value="DEPART">
+                                </span>
+                                <span>
+                                    Arrive<input id="start_type" x-model="$store.search_parameters.start_type"
+                                        type="radio" value="ARRIVE">
+                                </span>
+                            </span>
+                            <span class="form_input">
+                                <label for="return_time">Journey return time</label>
+                                <input id="return_time" x-model="$store.search_parameters.return_time" type="text"
+                                    placeholder="return time">
+                            </span>
+                            <span class="form_input">
+                                <label for="return_type">Journey return time type</label>
+                                <span>
+                                    Depart<input id="return_type" x-model="$store.search_parameters.return_type"
+                                        type="radio" value="DEPART">
+                                </span>
+                                <span>
+                                    Arrive<input id="return_type" x-model="$store.search_parameters.return_type"
+                                        type="radio" value="ARRIVE">
+                                </span>
+                            </span>
+                            <span class="form_input">
+                                <label for="day_of_week">Journey day</label>
+                                <select id="day_of_week" x-model.number="$store.search_parameters.day_of_week"
+                                    placeholder="day of week">
+                                    <option value="0">SUN</option>
+                                    <option value="1">MON</option>
+                                    <option value="2">TUE</option>
+                                    <option value="3">WED</option>
+                                    <option value="4">THU</option>
+                                    <option value="5">FRI</option>
+                                    <option value="6">SAT</option>
+                                </select>
+                            </span>
+                            <span class="form_input">
+                                <label for="rail_card">Rail card type</label>
+                                <input id="rail_card" x-model="$store.search_parameters.rail_card" type="text"
+                                    placeholder="rail card">
+                            </span>
+                        </span>
+                        <button>Search</button>
+                    </form>
+                </div>
+                <div x-cloak class="section">
+                    <div class="loader" x-show="loading"></div>
+                    <p x-show="failed">Something went wrong...</p>
+                    <template x-for="(property_group, group_index) in groups" :key="property_group.station.id">
+                        <div class="property_group_container">
+                            <h3 x-text="property_group.station.name" class="property_group_heading"></h3>
+                            <h4>Journey details:</h4>
+                            <div class="journey_summary_container details_container">
+                                <div class="details_list">
+                                    <a class="details_item"
+                                        x-on:click="window.open('https://www.google.com/maps/search/?api=1&query=' + property_group.station.location[1] + '%2C' + property_group.station.location[0], '_blank')">View
+                                        station</a>
+                                    <span class="details_item"
+                                        x-text="'fastest journey time: ' + property_group.journey_summary.outbound_details.journey_time_details.fastest_time + ' minutes'"></span>
+                                    <span class="details_item"
+                                        x-text="'average wait time: ' + property_group.journey_summary.outbound_details.journey_time_details.average_wait + ' minutes'"></span>
+                                </div>
                             </div>
+                            <h4>Properties:</h4>
+                            <template x-for="(property, property_index) in property_group.properties"
+                                :key="property.id">
+                                <div class="property_details_container details_container">
+                                    <div class="details_list">
+                                        <button x-show="!property.star"
+                                            x-on:click="set_star(property.id, true, group_index, property_index)">Star</button>
+                                        <button x-show="property.star"
+                                            x-on:click="set_star(property.id, false, group_index, property_index)">Remove
+                                            star</button>
+                                        <a class="details_item"
+                                            x-on:click="window.open('https://www.rightmove.co.uk/properties/' + property.id, '_blank')">View
+                                            on RightMove</a>
+                                        <span class="details_item" x-text="'price: £' + property.price"></span>
+                                        <span class="details_item" x-text="'bedrooms: ' + property.bedrooms"></span>
+                                        <span class="details_item" x-text="'bathrooms: ' + property.bathrooms"></span>
+                                        <span class="details_item" x-text="'address: ' + property.address"></span>
+                                    </div>
+                                </div>
+                            </template>
                         </div>
                     </template>
                 </div>
-            </template>
-        </div>
-    </div>
+            </div>
+        </span>
+    </template>
     <script>
         document.addEventListener('alpine:init', () => {
-            Alpine.data("search_parameters", () => ({
+            Alpine.store("router", {
+                logged_in: window.localStorage.getItem("token") != null,
+                username: null,
+                password: null,
+                error: null,
+                route: 'search',
+
+                login() {
+                    const body = new URLSearchParams({
+                        "username": this.username,
+                        "password": this.password
+                    });
+                    const options = {
+                        method: "POST",
+                        headers: { "content-type": "application/x-www-form-urlencoded" },
+                        body: body
+                    };
+                    fetch("/auth/token", options).then(response => {
+                        response.json().then(data => {
+                            if ("access_token" in data) {
+                                this.error = null;
+                                window.localStorage.setItem("token", data.access_token);
+                                this.logged_in = true;
+                            } else if ("detail" in data) {
+                                this.error = data.detail;
+                            } else {
+                                this.error = "Login failed";
+                                console.error(data);
+                            }
+                        }, error => {
+                            this.error = "Login failed";
+                            console.error("Failed to parse response", error);
+                        })
+                    }, error => {
+                        this.error = "Login failed";
+                        console.error("Failed to login", error);
+                    }).finally(() => {
+                        this.password = null;
+                    });
+                }
+            });
+
+            Alpine.store("search_parameters", {
                 destination: "LST",
                 start_time: "09:15:00",
                 start_type: "ARRIVE",
@@ -164,41 +279,115 @@
                         max_bedrooms: this.max_bedrooms
                     }
                 }
-            }));
+            });
 
-            Alpine.store("property_groups", () => ({
+            Alpine.data("property_groups", () => ({
                 groups: [],
                 loading: false,
                 failed: false,
 
                 search(e) {
                     console.log("Search", e)
-                    this.groups = []
-                    this.loading = true
+                    this.groups = [];
+                    this.loading = true;
                     const options = {
-                        method: 'POST',
-                        headers: { 'content-type': 'application/json' },
+                        method: "POST",
+                        headers: {
+                            "content-type": "application/json",
+                            "Authorization": "Bearer " + window.localStorage.getItem("token")
+                        },
                         body: JSON.stringify(e)
                     };
                     fetch("/search/find-properties", options).then(response => {
+                        if (response.status == 401 || response.status == 403) {
+                            logout();
+                            return;
+                        }
                         response.json().then(data => {
-                            console.log(data)
-                            this.groups = data
-                            this.loading = false
-                            this.failed = false
+                            console.log(data);
+                            this.groups = data;
+                            this.loading = false;
+                            this.failed = false;
                         }, error => {
                             console.error("Failed to parse response", error)
-                            this.loading = false
-                            this.failed = true
+                            this.loading = false;
+                            this.failed = true;
                         })
                     }, error => {
                         console.error("Failed to search", error)
-                        this.loading = false
-                        this.failed = true
+                        this.loading = false;
+                        this.failed = true;
+                    })
+                },
+
+                set_star(id, set, group, property) {
+                    const options = {
+                        method: "POST",
+                        headers: {
+                            "Authorization": "Bearer " + window.localStorage.getItem("token")
+                        }
+                    };
+                    this.groups[group].properties[property].star = set;
+                    let promise;
+                    if (set) {
+                        promise = fetch("/user/star-property/" + id, options);
+                    } else {
+                        promise = fetch("/user/unstar-property/" + id, options);
+                    }
+                    promise.then(response => {
+                        if (response.status == 401 || response.status == 403) {
+                            logout();
+                        }
                     })
                 }
             }));
-        })
+
+            Alpine.data("stared", () => ({
+                properties: [],
+
+                init() {
+                    const options = {
+                        method: "GET",
+                        headers: {
+                            "Authorization": "Bearer " + window.localStorage.getItem("token")
+                        }
+                    };
+                    fetch("/user/stared-properties", options).then(response => {
+                        if (response.status == 401 || response.status == 403) {
+                            logout();
+                            return;
+                        }
+                        response.json().then(data => {
+                            this.properties = data
+                        }, error => {
+                            console.error("Failed to parse response", error)
+                        })
+                    }, error => {
+                        console.error("Failed to get stared properties", error)
+                    })
+                },
+
+                remove_star(id, index) {
+                    const options = {
+                        method: "POST",
+                        headers: {
+                            "Authorization": "Bearer " + window.localStorage.getItem("token")
+                        }
+                    };
+                    fetch("/user/unstar-property/" + id, options).then(response => {
+                        if (response.status == 401 || response.status == 403) {
+                            logout();
+                        }
+                    });
+                    this.properties.splice(index, 1)
+                }
+            }));
+        });
+
+        function logout() {
+            window.localStorage.removeItem("token");
+            window.location.reload();
+        };
     </script>
 </body>
 
