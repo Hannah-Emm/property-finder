@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.security import OAuth2PasswordRequestForm
@@ -52,18 +52,20 @@ async def find_properties(search_request: MatchingPropertySearchRequest, current
     return await search.search(search_request, current_user)
 
 
-@app.post("/user/star-property/{property_id}")
-async def star_property(property_id: int, db_connection: DBConnection, current_user: CurrentUser):
+@app.post("/user/star-property/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def star_property(property_id: int, db_connection: DBConnection, current_user: CurrentUser) -> None:
     await set_property_preference(db_connection, current_user, property_id, PropertyPreference.STAR)
 
 
-@app.post("/user/unstar-property/{property_id}")
-async def unstar_property(property_id: int, db_connection: DBConnection, current_user: CurrentUser):
+@app.post("/user/unstar-property/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def unstar_property(property_id: int, db_connection: DBConnection, current_user: CurrentUser) -> None:
     await remove_property_preference(db_connection, current_user, property_id)
+
 
 @app.get("/user/stared-properties", response_model=list[Property])
 async def stared_properties(db_connection: DBConnection, current_user: CurrentUser):
     return await get_stared_properties(db_connection, current_user)
+
 
 @app.post("/auth/token", response_model=Token)
 async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db_connection: DBConnection):
