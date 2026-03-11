@@ -10,7 +10,8 @@ from .journey import TrainJourneySearchRequest, JourneyFinderInstance, JourneySu
 from .search import MatchingPropertySearchRequest, PropertyStationGroupDetails, SearchInstance
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .tasks import fetch_properties_by_stations
-from .user import authenticate_user, create_access_token, Token, Current_User
+from .user import authenticate_user, create_access_token, Token, CurrentUser
+from .preferences import set_property_preference, remove_property_preference, PropertyPreference
 
 
 @asynccontextmanager
@@ -37,8 +38,8 @@ async def index():
 
 
 @app.post("/search/near-stations", response_model=list[PropertyStationGroup])
-async def search_near_stations(search_request: PropertyNearStationSearchRequest, property_finder: PropertyFinderInstance):
-    return await property_finder.find_properties_near_stations(search_request)
+async def search_near_stations(search_request: PropertyNearStationSearchRequest, current_user: CurrentUser, property_finder: PropertyFinderInstance):
+    return await property_finder.find_properties_near_stations(search_request, current_user)
 
 
 @app.post("/search/train-journey", response_model=JourneySummary)
@@ -47,8 +48,20 @@ async def find_journey(search_request: TrainJourneySearchRequest, journey_finder
 
 
 @app.post("/search/find-properties", response_model=list[PropertyStationGroupDetails])
-async def find_properties(search_request: MatchingPropertySearchRequest, current_user: Current_User, search: SearchInstance):
-    return await search.search(search_request)
+async def find_properties(search_request: MatchingPropertySearchRequest, current_user: CurrentUser, search: SearchInstance):
+    return await search.search(search_request, current_user)
+
+
+@app.post("/user/star-property/{property_id}")
+async def star_property(property_id: int, db_connection: DBConnection, current_user: CurrentUser):
+    await set_property_preference(db_connection, current_user, property_id, PropertyPreference.STAR)
+
+
+@app.post("/user/unstar-property/{property_id}")
+async def unstar_property(property_id: int, db_connection: DBConnection, current_user: CurrentUser):
+    await remove_property_preference(db_connection, current_user, property_id)
+
+
 @app.post("/auth/token", response_model=Token)
 async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db_connection: DBConnection):
     user = await authenticate_user(db_connection, form_data.username, form_data.password)

@@ -119,7 +119,7 @@
             <div x-cloak class="section">
                 <div class="loader" x-show="loading"></div>
                 <p x-show="failed">Something went wrong...</p>
-                <template x-for="property_group in groups">
+                <template x-for="(property_group, group_index) in groups" :key="property_group.station.id">
                     <div class="property_group_container">
                         <h3 x-text="property_group.station.name" class="property_group_heading"></h3>
                         <h4>Journey details:</h4>
@@ -135,10 +135,17 @@
                             </div>
                         </div>
                         <h4>Properties:</h4>
-                        <template x-for="property in property_group.properties">
-                            <div class="property_details_container details_container"
-                                x-on:click="window.open('https://www.rightmove.co.uk/properties/' + property.id, '_blank')">
+                        <template x-for="(property, property_index) in property_group.properties" :key="property.id">
+                            <div class="property_details_container details_container">
                                 <div class="details_list">
+                                    <button x-show="!property.star"
+                                        x-on:click="set_star(property.id, true, group_index, property_index)">Star</button>
+                                    <button x-show="property.star"
+                                        x-on:click="set_star(property.id, false, group_index, property_index)">Remove
+                                        star</button>
+                                    <a class="details_item"
+                                        x-on:click="window.open('https://www.rightmove.co.uk/properties/' + property.id, '_blank')">View
+                                        on RightMove</a>
                                     <span class="details_item" x-text="'price: £' + property.price"></span>
                                     <span class="details_item" x-text="'bedrooms: ' + property.bedrooms"></span>
                                     <span class="details_item" x-text="'bathrooms: ' + property.bathrooms"></span>
@@ -247,9 +254,7 @@
                     };
                     fetch("/search/find-properties", options).then(response => {
                         if (response.status == 401 || response.status == 403) {
-                            window.localStorage.removeItem("token");
-                            window.location.reload();
-                            return;
+                            this.logout()
                         }
                         response.json().then(data => {
                             console.log(data);
@@ -266,6 +271,32 @@
                         this.loading = false;
                         this.failed = true;
                     })
+                },
+
+                set_star(id, set, group, property) {
+                    const options = {
+                        method: "POST",
+                        headers: {
+                            "Authorization": "Bearer " + window.localStorage.getItem("token")
+                        }
+                    };
+                    this.groups[group].properties[property].star = set;
+                    let promise;
+                    if (set) {
+                        promise = fetch("/user/star-property/" + id, options);
+                    } else {
+                        promise = fetch("/user/unstar-property/" + id, options);
+                    }
+                    promise.then(response => {
+                        if (response.status == 401 || response.status == 403) {
+                            this.logout()
+                        }
+                    })
+                },
+
+                logout() {
+                    window.localStorage.removeItem("token");
+                    window.location.reload();
                 }
             }));
         })

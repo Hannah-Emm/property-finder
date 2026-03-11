@@ -42,3 +42,12 @@ create table users (
     username text not null primary key,
     password text not null   
 )
+
+create type property_preference as enum ('STAR', 'HIDE')
+
+create table property_preferences (
+    property_id bigint references properties(id),
+    user_id text references users(username),
+    preference property_preference not null,
+    primary key (property_id, user_id)
+)

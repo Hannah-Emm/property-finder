@@ -2,6 +2,8 @@ from .db import DBConnection, db_fetch_all
 from pydantic import BaseModel
 from typing import Optional, Annotated
 from fastapi import Depends
+from .preferences import PropertyPreference
+from .user import CurrentUser
 
 
 class SimplePropertySearchRequest(BaseModel):
@@ -24,6 +26,7 @@ class Property(BaseModel):
     price: int
     bedrooms: Optional[int] = None
     bathrooms: Optional[int] = None
+    star: bool
 
 
 class Station(BaseModel):
@@ -39,9 +42,14 @@ class PropertyStationGroup(BaseModel):
 
 class PropertyFinder():
     _SEARCH_BY_NEAR_STATIONS_QUERY_TEMPLATE = """
-                select p.id, ST_X(p.location::geometry), ST_Y(p.location::geometry), address, price, bedrooms, bathrooms, s.id, s.name, ST_X(s.location::geometry), ST_Y(s.location::geometry) 
+                select 
+                p.id, ST_X(p.location::geometry), ST_Y(p.location::geometry), address, price, bedrooms, bathrooms, 
+                s.id, s.name, ST_X(s.location::geometry), ST_Y(s.location::geometry),
+                pref.preference
                 from properties as p join stations as s 
-                on ST_DWithin(p.location, s.location, %(max_station_distance)s) 
+                on ST_DWithin(p.location, s.location, %(max_station_distance)s)
+                left outer join property_preferences as pref
+                on pref.user_id=%(username)s and pref.property_id=p.id
                 where 
                 (%(max_price)s::smallint is null or p.price <= %(max_price)s)
                 and (%(min_price)s::smallint is null or p.price >= %(min_price)s)
@@ -54,14 +62,16 @@ class PropertyFinder():
     def __init__(self, connection: DBConnection):
         self.connection = connection
 
-    async def find_properties_near_stations(self, request: PropertyNearStationSearchRequest) -> list[PropertyStationGroup]:
-        rows = await db_fetch_all(self.connection, PropertyFinder._SEARCH_BY_NEAR_STATIONS_QUERY_TEMPLATE, request.model_dump())
+    async def find_properties_near_stations(self, request: PropertyNearStationSearchRequest, user: CurrentUser) -> list[PropertyStationGroup]:
+        args = request.model_dump()
+        args["username"] = user.username
+        rows = await db_fetch_all(self.connection, PropertyFinder._SEARCH_BY_NEAR_STATIONS_QUERY_TEMPLATE, args)
         groups = {}
         for row in rows:
             station = Station(id=str(row[7]), name=str(
                 row[8]), location=(row[9], row[10]))
             groups.setdefault(station.id, (station, []))[1].append(
-                Property(id=str(row[0]), location=(row[1], row[2]), address=str(row[3]), price=str(row[4]), bedrooms=row[5], bathrooms=row[6]))
+                Property(id=str(row[0]), location=(row[1], row[2]), address=str(row[3]), price=str(row[4]), bedrooms=row[5], bathrooms=row[6], star=row[11] == PropertyPreference.STAR.name))
         results = []
         for group in groups.values():
             results.append(PropertyStationGroup(

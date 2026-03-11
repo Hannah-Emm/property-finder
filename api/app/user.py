@@ -72,4 +72,4 @@ def create_access_token(username: str, expiry_minutes: int = 1440) -> Token:
     return Token(access_token=jwt.encode(content, _SECRET_KEY, algorithm=_ALGORITHM), token_type="bearer")
 
 
-type Current_User = Annotated[User, Depends(get_current_user)]
+type CurrentUser = Annotated[User, Depends(get_current_user)]
