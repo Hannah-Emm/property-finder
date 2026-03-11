@@ -37,3 +37,8 @@ create table journeys (
 CREATE INDEX properties_location ON properties USING GIST (location);
 
 CREATE INDEX stations_location ON stations USING GIST (location);
+
+create table users (
+    username text not null primary key,
+    password text not null   
+)

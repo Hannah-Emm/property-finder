@@ -6,3 +6,5 @@ fastapi[standard-no-fastapi-cloud-cli] == 0.132.0
 APScheduler == 3.11.2
 polyline == 2.0.4
 polycircles == 0.3.7
+PyJWT == 2.11.0
+pwdlib[argon2] == 0.3.0
