@@ -2,7 +2,7 @@ from .db import DBConnection, db_fetch_all
 from pydantic import BaseModel
 from typing import Optional, Annotated
 from fastapi import Depends
-from .preferences import PropertyPreference
+from .enums import PropertyPreference
 from .user import CurrentUser
 
 

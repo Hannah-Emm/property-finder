@@ -5,13 +5,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Annotated
 from .db import get_db_connection_pool, DBConnection
-from .property import PropertyNearStationSearchRequest, PropertyFinderInstance, PropertyStationGroup
+from .property import PropertyNearStationSearchRequest, PropertyFinderInstance, PropertyStationGroup, Property
 from .journey import TrainJourneySearchRequest, JourneyFinderInstance, JourneySummary
 from .search import MatchingPropertySearchRequest, PropertyStationGroupDetails, SearchInstance
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .tasks import fetch_properties_by_stations
 from .user import authenticate_user, create_access_token, Token, CurrentUser
-from .preferences import set_property_preference, remove_property_preference, PropertyPreference
+from .preferences import set_property_preference, remove_property_preference, get_stared_properties, PropertyPreference
 
 
 @asynccontextmanager
@@ -61,6 +61,9 @@ async def star_property(property_id: int, db_connection: DBConnection, current_u
 async def unstar_property(property_id: int, db_connection: DBConnection, current_user: CurrentUser):
     await remove_property_preference(db_connection, current_user, property_id)
 
+@app.get("/user/stared-properties", response_model=list[Property])
+async def stared_properties(db_connection: DBConnection, current_user: CurrentUser):
+    return await get_stared_properties(db_connection, current_user)
 
 @app.post("/auth/token", response_model=Token)
 async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()], db_connection: DBConnection):

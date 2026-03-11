@@ -9,7 +9,7 @@
     <title>Property Finder</title>
 </head>
 
-<body x-data="login">
+<body x-data="$store.router">
     <span x-show="!logged_in">
         <p>Log in</p>
         <p x-show="error != null" x-text="error"></p>
@@ -27,7 +27,31 @@
             <button>Login</button>
         </form>
     </span>
-    <span x-show="logged_in">
+    <template x-if="logged_in && route=='stared'">
+        <span x-data="stared">
+            <button x-on:click="route='search'">Back to search</button>
+            <div class="property_group_container">
+                <h3 class="property_group_heading">Stared properties</h3>
+                <template x-for="(property, property_index) in properties" :key="property.id">
+                    <div class="property_details_container details_container">
+                        <div class="details_list">
+                            <button x-show="property.star" x-on:click="remove_star(property.id, property_index)">Remove
+                                star</button>
+                            <a class="details_item"
+                                x-on:click="window.open('https://www.rightmove.co.uk/properties/' + property.id, '_blank')">View
+                                on RightMove</a>
+                            <span class="details_item" x-text="'price: £' + property.price"></span>
+                            <span class="details_item" x-text="'bedrooms: ' + property.bedrooms"></span>
+                            <span class="details_item" x-text="'bathrooms: ' + property.bathrooms"></span>
+                            <span class="details_item" x-text="'address: ' + property.address"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </span>
+    </template>
+    <span x-show="logged_in && route=='search'">
+        <button x-on:click="route='stared'">View stared properties</button>
         <div x-data="$store.property_groups">
             <div x-data="search_parameters" class="search_bar section">
                 <form id="form" class="search_form" x-validate.validate-on-submit
@@ -160,11 +184,12 @@
     </span>
     <script>
         document.addEventListener('alpine:init', () => {
-            Alpine.data("login", () => ({
+            Alpine.store("router", () => ({
                 logged_in: window.localStorage.getItem("token") != null,
                 username: null,
                 password: null,
                 error: null,
+                route: 'search',
 
                 login() {
                     const body = new URLSearchParams({
@@ -199,7 +224,7 @@
                         this.password = null;
                     });
                 }
-            }))
+            }));
 
             Alpine.data("search_parameters", () => ({
                 destination: "LST",
@@ -254,7 +279,8 @@
                     };
                     fetch("/search/find-properties", options).then(response => {
                         if (response.status == 401 || response.status == 403) {
-                            this.logout()
+                            logout();
+                            return;
                         }
                         response.json().then(data => {
                             console.log(data);
@@ -289,17 +315,58 @@
                     }
                     promise.then(response => {
                         if (response.status == 401 || response.status == 403) {
-                            this.logout()
+                            logout();
                         }
+                    })
+                }
+            }));
+
+            Alpine.data("stared", () => ({
+                properties: [],
+
+                init() {
+                    const options = {
+                        method: "GET",
+                        headers: {
+                            "Authorization": "Bearer " + window.localStorage.getItem("token")
+                        }
+                    };
+                    fetch("/user/stared-properties", options).then(response => {
+                        if (response.status == 401 || response.status == 403) {
+                            logout();
+                            return;
+                        }
+                        response.json().then(data => {
+                            this.properties = data
+                        }, error => {
+                            console.error("Failed to parse response", error)
+                        })
+                    }, error => {
+                        console.error("Failed to get stared properties", error)
                     })
                 },
 
-                logout() {
-                    window.localStorage.removeItem("token");
-                    window.location.reload();
+                remove_star(id, index) {
+                    const options = {
+                        method: "POST",
+                        headers: {
+                            "Authorization": "Bearer " + window.localStorage.getItem("token")
+                        }
+                    };
+                    fetch("/user/unstar-property/" + id, options).then(response => {
+                        if (response.status == 401 || response.status == 403) {
+                            logout();
+                        }
+                    });
+                    this.properties.splice(index, 1)
                 }
             }));
-        })
+        });
+
+        function logout() {
+            window.localStorage.removeItem("token");
+            window.location.reload();
+        };
     </script>
 </body>
 
