@@ -185,6 +185,15 @@
                         <button>Search</button>
                     </form>
                 </div>
+                <div x-show="groups.length > 0" class="section">
+                    <span class="form_input">
+                        <label for="sort_by">Sort by</label>
+                        <select id="sort_by" x-model="sort_by">
+                            <option value="cheapest">Cheapest</option>
+                            <option value="shortest_journey">Shortest journey</option>
+                        </select>
+                    </span>
+                </div>
                 <div x-cloak class="section">
                     <div class="loader" x-show="loading"></div>
                     <p x-show="failed">Something went wrong...</p>
@@ -311,11 +320,17 @@
 
             Alpine.data("property_groups", () => ({
                 groups: [],
+                sort_by: "cheapest",
                 loading: false,
                 failed: false,
 
+                init() {
+                    this.$watch("sort_by", sort_option => {
+                        this.sort(sort_option);
+                    });
+                },
+
                 search(e) {
-                    console.log("Search", e)
                     this.groups = [];
                     this.loading = true;
                     const options = {
@@ -332,8 +347,8 @@
                             return;
                         }
                         response.json().then(data => {
-                            console.log(data);
                             this.groups = data;
+                            this.sort(this.sort_by);
                             this.loading = false;
                             this.failed = false;
                         }, error => {
@@ -345,7 +360,19 @@
                         console.error("Failed to search", error)
                         this.loading = false;
                         this.failed = true;
-                    })
+                    });
+                },
+
+                sort(sort_option) {
+                    if (sort_option == "cheapest") {
+                        this.groups.sort((a, b) => {
+                            a_cheapest = a.properties.reduce((cheapest, property) => Math.min(cheapest, property.price), a.properties[0].price);
+                            b_cheapest = b.properties.reduce((cheapest, property) => Math.min(cheapest, property.price), b.properties[0].price);
+                            return a_cheapest - b_cheapest;
+                        });
+                    } else if (sort_option == "shortest_journey") {
+                        this.groups.sort((a, b) => a.journey_summary.outbound_details.journey_time_details.fastest_time - b.journey_summary.outbound_details.journey_time_details.fastest_time);
+                    }
                 },
 
                 set_star(id, set, group, property) {
@@ -383,8 +410,9 @@
                     });
                     this.groups[group].properties.splice(property, 1)
                     if (this.groups[group].properties.length === 0) {
-                        this.groups.splice(group, 1)
+                        this.groups.splice(group, 1);
                     }
+                    this.sort(this.sort_by);
                 }
             }));
 
