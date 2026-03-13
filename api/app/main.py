@@ -11,7 +11,7 @@ from .search import MatchingPropertySearchRequest, PropertyStationGroupDetails, 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from .tasks import fetch_properties_by_stations
 from .user import authenticate_user, create_access_token, Token, CurrentUser
-from .preferences import set_property_preference, remove_property_preference, get_stared_properties, PropertyPreference
+from .preferences import set_property_preference, remove_property_preference, get_stared_properties, get_hidden_properties, PropertyPreference
 
 
 @asynccontextmanager
@@ -65,6 +65,21 @@ async def unstar_property(property_id: int, db_connection: DBConnection, current
 @app.get("/user/stared-properties", response_model=list[Property])
 async def stared_properties(db_connection: DBConnection, current_user: CurrentUser):
     return await get_stared_properties(db_connection, current_user)
+
+
+@app.post("/user/hide-property/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def hide_property(property_id: int, db_connection: DBConnection, current_user: CurrentUser) -> None:
+    await set_property_preference(db_connection, current_user, property_id, PropertyPreference.HIDE)
+
+
+@app.post("/user/unhide-property/{property_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def unhide_property(property_id: int, db_connection: DBConnection, current_user: CurrentUser) -> None:
+    await remove_property_preference(db_connection, current_user, property_id)
+
+
+@app.get("/user/hidden-properties", response_model=list[Property])
+async def hidden_properties(db_connection: DBConnection, current_user: CurrentUser):
+    return await get_hidden_properties(db_connection, current_user)
 
 
 @app.post("/auth/token", response_model=Token)
