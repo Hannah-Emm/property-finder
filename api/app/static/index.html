@@ -410,8 +410,9 @@
                     });
                     this.groups[group].properties.splice(property, 1)
                     if (this.groups[group].properties.length === 0) {
-                        this.groups.splice(group, 1)
+                        this.groups.splice(group, 1);
                     }
+                    this.sort(this.sort_by);
                 }
             }));
 
