@@ -51,7 +51,8 @@ class PropertyFinder():
                 left outer join property_preferences as pref
                 on pref.user_id=%(username)s and pref.property_id=p.id
                 where 
-                (%(max_price)s::smallint is null or p.price <= %(max_price)s)
+                (pref.preference is null or pref.preference != 'HIDE')
+                and (%(max_price)s::smallint is null or p.price <= %(max_price)s)
                 and (%(min_price)s::smallint is null or p.price >= %(min_price)s)
                 and (%(max_bedrooms)s::smallint is null or p.bedrooms <= %(max_bedrooms)s)
                 and (%(min_bedrooms)s::smallint is null or p.bedrooms >= %(min_bedrooms)s)

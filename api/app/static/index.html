@@ -32,16 +32,43 @@
             </form>
         </span>
     </template>
+    <template x-if="$store.router.logged_in">
+        <div>
+            <button x-on:click="$store.router.route='search'">Property search</button>
+            <button x-on:click="$store.router.route='stared'">Stared properties</button>
+            <button x-on:click="$store.router.route='hidden'">Hidden properties</button>
+        </div>
+    </template>
     <template x-if="$store.router.logged_in && $store.router.route=='stared'">
-        <span x-data="stared">
-            <button x-on:click="$store.router.route='search'">Back to search</button>
+        <span x-data="property_preference('/user/stared-properties/', '/user/unstar-property/')">
             <div class="property_group_container">
                 <h3 class="property_group_heading">Stared properties</h3>
                 <template x-for="(property, property_index) in properties" :key="property.id">
                     <div class="property_details_container details_container">
                         <div class="details_list">
-                            <button x-show="property.star" x-on:click="remove_star(property.id, property_index)">Remove
+                            <button x-show="property.star" x-on:click="unset(property.id, property_index)">Remove
                                 star</button>
+                            <a class="details_item"
+                                x-on:click="window.open('https://www.rightmove.co.uk/properties/' + property.id, '_blank')">View
+                                on RightMove</a>
+                            <span class="details_item" x-text="'price: £' + property.price"></span>
+                            <span class="details_item" x-text="'bedrooms: ' + property.bedrooms"></span>
+                            <span class="details_item" x-text="'bathrooms: ' + property.bathrooms"></span>
+                            <span class="details_item" x-text="'address: ' + property.address"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
+        </span>
+    </template>
+    <template x-if="$store.router.logged_in && $store.router.route=='hidden'">
+        <span x-data="property_preference('/user/hidden-properties/', '/user/unhide-property/')">
+            <div class="property_group_container">
+                <h3 class="property_group_heading">Hidden properties</h3>
+                <template x-for="(property, property_index) in properties" :key="property.id">
+                    <div class="property_details_container details_container">
+                        <div class="details_list">
+                            <button x-show="property.star" x-on:click="unset(property.id, property_index)">Show</button>
                             <a class="details_item"
                                 x-on:click="window.open('https://www.rightmove.co.uk/properties/' + property.id, '_blank')">View
                                 on RightMove</a>
@@ -57,7 +84,6 @@
     </template>
     <template x-if="$store.router.logged_in && $store.router.route=='search'">
         <span>
-            <button x-on:click="$store.router.route='stared'">View stared properties</button>
             <div x-data="property_groups">
                 <div class="search_bar section">
                     <form id="form" class="search_form" x-validate.validate-on-submit
@@ -187,6 +213,8 @@
                                         <button x-show="property.star"
                                             x-on:click="set_star(property.id, false, group_index, property_index)">Remove
                                             star</button>
+                                        <button
+                                            x-on:click="hide(property.id, group_index, property_index)">Hide</button>
                                         <a class="details_item"
                                             x-on:click="window.open('https://www.rightmove.co.uk/properties/' + property.id, '_blank')">View
                                             on RightMove</a>
@@ -339,10 +367,30 @@
                             logout();
                         }
                     })
+                },
+
+                hide(id, group, property) {
+                    const options = {
+                        method: "POST",
+                        headers: {
+                            "Authorization": "Bearer " + window.localStorage.getItem("token")
+                        }
+                    };
+                    fetch("/user/hide-property/" + id, options).then(response => {
+                        if (response.status == 401 || response.status == 403) {
+                            logout();
+                        }
+                    });
+                    this.groups[group].properties.splice(property, 1)
+                    if (this.groups[group].properties.length === 0) {
+                        this.groups.splice(group, 1)
+                    }
                 }
             }));
 
-            Alpine.data("stared", () => ({
+            Alpine.data("property_preference", (get_route, unset_route) => ({
+                get_route: get_route,
+                unset_route: unset_route,
                 properties: [],
 
                 init() {
@@ -352,7 +400,7 @@
                             "Authorization": "Bearer " + window.localStorage.getItem("token")
                         }
                     };
-                    fetch("/user/stared-properties", options).then(response => {
+                    fetch(this.get_route, options).then(response => {
                         if (response.status == 401 || response.status == 403) {
                             logout();
                             return;
@@ -363,18 +411,18 @@
                             console.error("Failed to parse response", error)
                         })
                     }, error => {
-                        console.error("Failed to get stared properties", error)
+                        console.error("Failed to get properties", error)
                     })
                 },
 
-                remove_star(id, index) {
+                unset(id, index) {
                     const options = {
                         method: "POST",
                         headers: {
                             "Authorization": "Bearer " + window.localStorage.getItem("token")
                         }
                     };
-                    fetch("/user/unstar-property/" + id, options).then(response => {
+                    fetch(unset_route + id, options).then(response => {
                         if (response.status == 401 || response.status == 403) {
                             logout();
                         }
